@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garmin Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{--bg:#0f0f0f;--bg2:#1a1a1a;--bg3:#242424;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#f0f0f0;--text2:#9a9a9a;--text3:#555;--accent:#3b82f6;--accent2:#1d6ff5;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa;--teal:#2dd4bf;--r:10px;--rl:14px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;min-height:100vh}
+  #app{display:flex;flex-direction:column;height:100vh}
+  header{padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+  .hl{display:flex;align-items:center;gap:10px}
+  .logo{width:28px;height:28px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center}
+  .logo svg{width:16px;height:16px;fill:white}
+  h1.st{font-size:15px;font-weight:600}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2)}
+  .api-area{display:flex;align-items:center;gap:8px}
+  .api-area input{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px 10px;font-size:12px;width:220px;outline:none}
+  .api-area input:focus{border-color:var(--accent)}
+  main{display:flex;flex:1;overflow:hidden}
+  #left{width:340px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  #msgs{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:12px}
+  #cin{padding:.75rem 1rem;border-top:1px solid var(--border);display:flex;gap:8px}
+  #ci{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;resize:none;font-family:inherit;min-height:38px;max-height:120px}
+  #ci:focus{border-color:var(--accent)}
+  #sb{background:var(--accent);border:none;color:white;border-radius:8px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;align-self:flex-end}
+  #sb:hover{background:var(--accent2)}
+  #sb:disabled{background:var(--bg3);cursor:not-allowed}
+  #sb svg{width:16px;height:16px}
+  .msg{display:flex;flex-direction:column;gap:3px}
+  .msg.u{align-items:flex-end}.msg.a{align-items:flex-start}
+  .bbl{padding:8px 12px;border-radius:10px;max-width:90%;font-size:13px;line-height:1.5;white-space:pre-wrap}
+  .msg.u .bbl{background:var(--accent);color:white;border-bottom-right-radius:3px}
+  .msg.a .bbl{background:var(--bg3);color:var(--text);border-bottom-left-radius:3px}
+  .mt2{font-size:10px;color:var(--text3);padding:0 4px}
+  .dots span{display:inline-block;width:5px;height:5px;background:var(--text2);border-radius:50%;margin:0 1px;animation:bk 1.2s infinite}
+  .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+  @keyframes bk{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+  #right{flex:1;overflow-y:auto;padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1.25rem}
+  #uz{border:2px dashed var(--border2);border-radius:var(--rl);padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+  #uz:hover,#uz.drag{border-color:var(--accent);background:rgba(59,130,246,.05)}
+  #uz .ic{font-size:2.5rem;margin-bottom:.75rem}
+  #uz h2{font-size:16px;font-weight:600;margin-bottom:6px}
+  #uz p{color:var(--text2);font-size:13px;margin-bottom:1rem}
+  #fi{display:none}
+  .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer}
+  .btn:hover{background:var(--accent2)}
+  #statusbox{padding:1rem;border-radius:var(--r);font-size:13px;display:none;border:1px solid var(--border2);background:var(--bg2)}
+  #statusbox.err{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:var(--red)}
+  #statusbox.ok{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.06);color:var(--green)}
+  #progressbar{height:3px;background:var(--accent);width:0%;transition:width .3s;border-radius:2px;margin-top:8px}
+  #dash{display:none;flex-direction:column;gap:1.25rem}
+  #dash.vis{display:flex}
+  .stl{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem}
+  .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  .mc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem}
+  .mc .lb{font-size:11px;color:var(--text2);margin-bottom:5px}
+  .mc .vl{font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1}
+  .mc .un{font-size:12px;color:var(--text2);margin-left:2px;font-weight:400}
+  .mc .sb3{font-size:11px;color:var(--text3);margin-top:4px}
+  .mc.green .vl{color:var(--green)}.mc.amber .vl{color:var(--amber)}.mc.blue .vl{color:var(--accent)}.mc.purple .vl{color:var(--purple)}.mc.teal .vl{color:var(--teal)}.mc.red .vl{color:var(--red)}
+  .cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:1rem 1.25rem}
+  .cc h3{font-size:13px;font-weight:600;margin-bottom:1rem}
+  .cw{position:relative;width:100%}
+  .at{width:100%;border-collapse:collapse;font-size:12px}
+  .at th{text-align:left;color:var(--text3);font-weight:500;padding:0 8px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .at td{padding:8px;border-top:1px solid var(--border)}
+  .at tr:hover td{background:var(--bg3)}
+  .tdot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
+  .dl{display:flex;flex-direction:column;gap:8px}
+  .di{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:.75rem 1rem;display:flex;align-items:center;gap:12px}
+  .dic{width:36px;height:36px;border-radius:8px;background:rgba(167,139,250,.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .din{flex:1}.din .nm{font-weight:500;font-size:13px}.din .mt3{font-size:11px;color:var(--text2);margin-top:2px}
+  .cb{width:60px;height:4px;background:var(--bg2);border-radius:2px;overflow:hidden}
+  .cf{height:100%;border-radius:2px;background:var(--purple)}
+  .tc{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+  ::-webkit-scrollbar{width:5px}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="hl">
+      <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>
+      <h1 class="st">Garmin Dashboard</h1>
+      <span id="dbadge" style="display:none" class="badge">✓ Chargé</span>
+    </div>
+    <div class="api-area">
+      <span style="font-size:12px;color:var(--text2)">Clé API Anthropic</span>
+      <input type="password" id="aki" placeholder="sk-ant-..." autocomplete="off">
+    </div>
+  </header>
+  <main>
+    <div id="left">
+      <div id="msgs">
+        <div class="msg a"><div class="bbl">Bonjour ! Importe ton export Garmin (ZIP) à droite 💪</div><span class="mt2">maintenant</span></div>
+      </div>
+      <div id="cin">
+        <textarea id="ci" placeholder="Pose une question..." rows="1"></textarea>
+        <button id="sb" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="right">
+      <div id="statusbox"></div>
+      <div id="uz">
+        <div class="ic">📦</div>
+        <h2>Importe ton export Garmin</h2>
+        <p>Glisse le ZIP reçu par email depuis Garmin Connect</p>
+        <button class="btn" onclick="document.getElementById('fi').click()">Choisir le fichier ZIP</button>
+        <input type="file" id="fi" accept=".zip">
+        <div id="progressbar"></div>
+      </div>
+      <div id="dash">
+        <div><div class="stl">Résumé</div><div class="mg" id="mgrid"></div></div>
+        <div class="tc">
+          <div class="cc"><h3>FC au repos — 90 derniers jours</h3><div class="cw" style="height:160px"><canvas id="hrC" role="img" aria-label="FC repos">FC repos</canvas></div></div>
+          <div class="cc"><h3>Body Battery — 30 derniers jours</h3><div class="cw" style="height:160px"><canvas id="bbC" role="img" aria-label="Body Battery">Body Battery</canvas></div></div>
+        </div>
+        <div class="cc">
+          <h3>Activités (20 dernières)</h3>
+          <div style="overflow-x:auto"><table class="at"><thead><tr><th>Date</th><th>Activité</th><th>Durée</th><th>Distance</th><th>FC moy.</th><th>Calories</th></tr></thead><tbody id="abody"></tbody></table></div>
+        </div>
+        <div id="detsec" style="display:none">
+          <div class="stl">Efforts détectés passivement</div>
+          <div class="dl" id="detlist"></div>
+        </div>
+        <div class="tc">
+          <div class="cc"><h3>Types d'activités</h3><div class="cw" style="height:180px"><canvas id="typeC" role="img" aria-label="Types">Types</canvas></div></div>
+          <div class="cc"><h3>Volume hebdomadaire (min)</h3><div class="cw" style="height:180px"><canvas id="weekC" role="img" aria-label="Volume">Volume</canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+// ── Statuts ───────────────────────────────────────────────────────────────
+const $st = document.getElementById('statusbox');
+const $pb = document.getElementById('progressbar');
+function setStatus(msg, type) {
+  $st.textContent = msg;
+  $st.className = type || '';
+  $st.style.display = 'block';
+  console.log('[Garmin]', msg);
+}
+function setProgress(pct) { $pb.style.width = pct + '%'; }
+
+// ── ZIP parser natif ───────────────────────────────────────────────────────
+function r16(b,o){return b[o]|(b[o+1]<<8)}
+function r32(b,o){return(b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0}
+
+async function parseZip(buf) {
+  setStatus('Lecture de la structure ZIP...'); setProgress(10);
+  const b = new Uint8Array(buf);
+  const files = {};
+
+  // Trouver EOCD (End of Central Directory)
+  let eocd = -1;
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 65536); i--) {
+    if (b[i]===0x50 && b[i+1]===0x4B && b[i+2]===0x05 && b[i+3]===0x06) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('Signature EOCD introuvable — fichier ZIP corrompu ou trop grand (ZIP64 non supporté)');
+
+  const cdOff = r32(b, eocd + 16);
+  const cdCnt = r16(b, eocd + 10);
+  setStatus(`Structure OK — ${cdCnt} entrées dans le ZIP`); setProgress(20);
+
+  let pos = cdOff;
+  let processed = 0;
+  for (let i = 0; i < cdCnt; i++) {
+    if (r32(b, pos) !== 0x02014B50) { console.warn('Entrée CD invalide à pos', pos); break; }
+    const meth  = r16(b, pos + 10);
+    const csz   = r32(b, pos + 20);
+    const fnLen = r16(b, pos + 28);
+    const exLen = r16(b, pos + 30);
+    const cmLen = r16(b, pos + 32);
+    const lhOff = r32(b, pos + 42);
+    const name  = new TextDecoder().decode(b.slice(pos + 46, pos + 46 + fnLen));
+    pos += 46 + fnLen + exLen + cmLen;
+
+    // Ignorer dossiers et fichiers non-JSON volumineux
+    if (name.endsWith('/')) continue;
+    if (!name.endsWith('.json')) continue;
+    // Ignorer le sous-ZIP et fichiers trop lourds
+    if (name.toLowerCase().includes('uploadedfiles')) continue;
+    if (csz > 5 * 1024 * 1024) { console.log('Fichier ignoré (trop grand):', name, csz); continue; }
+
+    const lFn   = r16(b, lhOff + 26);
+    const lEx   = r16(b, lhOff + 28);
+    const dStart = lhOff + 30 + lFn + lEx;
+    const cData  = b.slice(dStart, dStart + csz);
+
+    let content;
+    try {
+      if (meth === 0) {
+        content = new TextDecoder('utf-8').decode(cData);
+      } else if (meth === 8) {
+        const ds = new DecompressionStream('deflate-raw');
+        const w = ds.writable.getWriter();
+        const r = ds.readable.getReader();
+        w.write(cData); w.close();
+        const chunks = []; let total = 0;
+        while (true) {
+          const {done, value} = await r.read();
+          if (done) break;
+          chunks.push(value); total += value.length;
+        }
+        const out = new Uint8Array(total); let off = 0;
+        for (const c of chunks) { out.set(c, off); off += c.length; }
+        content = new TextDecoder('utf-8').decode(out);
+      } else {
+        console.log('Méthode compression inconnue:', meth, name);
+        continue;
+      }
+    } catch(e) { console.warn('Décompression échouée:', name, e.message); continue; }
+
+    files[name] = content;
+    processed++;
+    setProgress(20 + Math.min(60, processed * 3));
+  }
+
+  setStatus(`ZIP lu — ${processed} fichiers JSON extraits`); setProgress(80);
+  return files;
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+const S = { apiKey:'', activities:[], hrData:[], bbData:[], detected:[], history:[], loading:false };
+const $aki=$('aki'), $fi=$('fi'), $uz=$('uz'), $dash=$('dash');
+const $sb=$('sb'), $ci=$('ci'), $msgs=$('msgs');
+function $(id){return document.getElementById(id)}
+
+$aki.addEventListener('input', e => { S.apiKey = e.target.value.trim(); updBtn(); });
+function updBtn(){ $sb.disabled = !S.apiKey || S.loading || !S.activities.length; }
+
+// ── Drop + file input ──────────────────────────────────────────────────────
+$uz.addEventListener('dragover',  e => { e.preventDefault(); $uz.classList.add('drag'); });
+$uz.addEventListener('dragleave', () => $uz.classList.remove('drag'));
+$uz.addEventListener('drop', e => {
+  e.preventDefault(); $uz.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+$fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  setStatus(`Fichier reçu : ${file.name} (${(file.size/1024/1024).toFixed(1)} Mo)`, '');
+  setProgress(5);
+  try {
+    const buf = await file.arrayBuffer();
+    setStatus('Fichier lu en mémoire, décompression...'); setProgress(8);
+    const zfiles = await parseZip(buf);
+    setStatus('Analyse des données Garmin...');
+    processGarminZip(zfiles);
+  } catch(e) {
+    setStatus('❌ Erreur : ' + e.message, 'err');
+    console.error(e);
+    setProgress(0);
+  }
+}
+
+// ── Parse Garmin JSON ──────────────────────────────────────────────────────
+function processGarminZip(files) {
+  const names = Object.keys(files);
+  setStatus(`Fichiers JSON disponibles :\n${names.map(n=>n.split('/').pop()).join('\n')}`);
+
+  let foundActs = 0, foundUDS = 0;
+
+  for (const [name, txt] of Object.entries(files)) {
+    const base = name.toLowerCase();
+    try {
+      if (base.includes('summarizedactivities')) {
+        const data = JSON.parse(txt);
+        const arr = Array.isArray(data) ? data[0]?.summarizedActivitiesExport : data?.summarizedActivitiesExport;
+        if (arr?.length) { parseActivities(arr); foundActs = arr.length; }
+      } else if (base.includes('udsfile')) {
+        const arr = JSON.parse(txt);
+        if (Array.isArray(arr)) { parseUDS(arr); foundUDS += arr.length; }
+      }
+    } catch(e) { console.warn('Parse JSON échoué:', name, e.message); }
+  }
+
+  setStatus(`Activités : ${foundActs} · UDS jours : ${foundUDS}`); setProgress(95);
+
+  if (!S.activities.length && !S.hrData.length) {
+    setStatus('❌ Aucune donnée reconnue. Vérifie que c\'est le bon ZIP.', 'err');
+    return;
+  }
+
+  S.activities.sort((a,b) => b.date.localeCompare(a.date));
+  S.hrData.sort((a,b) => a.date.localeCompare(b.date));
+  S.bbData.sort((a,b) => a.date.localeCompare(b.date));
+
+  detectPassive();
+  renderAll();
+  setStatus(`✓ ${S.activities.length} activités · ${S.hrData.length}j FC repos · ${S.bbData.length}j Body Battery`, 'ok');
+  setProgress(100);
+  $('dbadge').style.display = 'inline-block';
+  $uz.style.display = 'none';
+  updBtn();
+  addMsg('a', `Données chargées ✓\n${S.activities.length} activités · ${S.hrData.length} jours FC repos · ${S.bbData.length} jours Body Battery\n\nPose-moi des questions !`);
+}
+
+function normType(t) {
+  if (!t) return 'Autre';
+  const l = t.toLowerCase();
+  if (l.includes('running') || l.includes('treadmill')) return 'Course';
+  if (l.includes('rowing') || l.includes('ergo')) return 'Ergo';
+  if (l.includes('cycl') || l.includes('bike')) return 'Vélo';
+  if (l.includes('swim')) return 'Natation';
+  if (l.includes('strength')) return 'Muscu';
+  if (l.includes('hiit') || l.includes('cardio')) return 'HIIT';
+  if (l.includes('yoga') || l.includes('breath')) return 'Mobilité';
+  return t;
+}
+
+function fmtDur(ms) {
+  if (!ms) return '—';
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+  return h > 0 ? `${h}h${String(m % 60).padStart(2,'0')}` : `${m}min`;
+}
+
+function parseActivities(arr) {
+  S.activities.push(...arr.map(a => {
+    const ts = a.beginTimestamp || a.startTimeGmt || 0;
+    const date = new Date(ts).toISOString().substring(0, 10);
+    return {
+      date,
+      type: normType(a.activityType || a.sportType || ''),
+      name: a.name || a.activityType || '',
+      duration: a.duration || 0,
+      distance: (a.distance || 0) / 100000,
+      hr: Math.round(a.avgHr || 0),
+      calories: Math.round((a.calories || 0) / 10),
+    };
+  }).filter(a => a.date && a.date !== '1970-01-01'));
+}
+
+function parseUDS(arr) {
+  for (const e of arr) {
+    if (!e.calendarDate) continue;
+    if (e.restingHeartRate) S.hrData.push({ date: e.calendarDate, hr: e.restingHeartRate });
+    const bbStats = e.bodyBattery?.bodyBatteryStatList;
+    if (bbStats) {
+      const high = bbStats.find(s => s.bodyBatteryStatType === 'HIGHEST');
+      const low  = bbStats.find(s => s.bodyBatteryStatType === 'LOWEST');
+      if (high || low) S.bbData.push({ date: e.calendarDate, high: high?.statsValue || 0, low: low?.statsValue || 0 });
+    }
+  }
+}
+
+function detectPassive() {
+  const actDates = new Set(S.activities.map(a => a.date));
+  const validHR = S.hrData.filter(d => d.hr > 0);
+  if (!validHR.length) return;
+  const baseline = Math.round(validHR.reduce((s,d) => s + d.hr, 0) / validHR.length);
+  S.detected = validHR
+    .filter(d => !actDates.has(d.date) && d.hr > baseline * 1.08)
+    .map(d => {
+      const elev = d.hr - baseline;
+      return { date: d.date, hr: d.hr, baseline, elev,
+        confidence: elev > 20 ? 90 : elev > 12 ? 75 : 55,
+        label: elev > 20 ? '🔥 Effort intense' : elev > 12 ? '💪 Effort modéré' : '🏃 Effort léger' };
+    })
+    .sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+const TC = { Course:'#3b82f6', Ergo:'#22c55e', Vélo:'#f59e0b', Natation:'#2dd4bf', Muscu:'#f97316', HIIT:'#ef4444', Mobilité:'#a78bfa', Autre:'#666' };
+const charts = {};
+
+function renderAll() {
+  $dash.classList.add('vis');
+  renderMetrics(); renderHR(); renderBB(); renderTable(); renderType(); renderWeek(); renderDetected();
+}
+
+function renderMetrics() {
+  const r7hr  = S.hrData.slice(-7);
+  const r7bb  = S.bbData.slice(-7);
+  const avgHR  = r7hr.length  ? Math.round(r7hr.reduce((s,d) => s+d.hr, 0) / r7hr.length) : null;
+  const avgBBh = r7bb.length  ? Math.round(r7bb.reduce((s,d) => s+d.high, 0) / r7bb.length) : null;
+  const avgBBl = r7bb.length  ? Math.round(r7bb.reduce((s,d) => s+d.low, 0)  / r7bb.length) : null;
+  const totDist = S.activities.reduce((s,a) => s + (a.distance||0), 0);
+  const totCal  = S.activities.reduce((s,a) => s + (a.calories||0), 0);
+  const hrc = avgHR ? (avgHR < 55 ? 'green' : avgHR < 65 ? 'blue' : 'amber') : 'blue';
+  const bbc = avgBBh ? (avgBBh > 70 ? 'green' : avgBBh > 45 ? 'amber' : 'red') : 'purple';
+  $('mgrid').innerHTML = `
+    <div class="mc blue"><div class="lb">Activités</div><div class="vl">${S.activities.length}</div><div class="sb3">${S.activities[0]?.date||''}</div></div>
+    <div class="mc ${hrc}"><div class="lb">FC repos (7j)</div><div class="vl">${avgHR??'—'}<span class="un">bpm</span></div><div class="sb3">${avgHR?(avgHR<55?'Excellente':avgHR<65?'Bonne':'Élevée'):'—'}</div></div>
+    <div class="mc ${bbc}"><div class="lb">Body Battery matin</div><div class="vl">${avgBBh??'—'}</div><div class="sb3">soir min: ${avgBBl??'—'}</div></div>
+    <div class="mc teal"><div class="lb">Distance totale</div><div class="vl">${Math.round(totDist)}<span class="un">km</span></div></div>
+    <div class="mc amber"><div class="lb">Calories</div><div class="vl">${totCal>999?(totCal/1000).toFixed(1)+'k':totCal}<span class="un">kcal</span></div></div>
+    <div class="mc purple"><div class="lb">Efforts détectés</div><div class="vl">${S.detected.length}</div><div class="sb3">non enregistrés</div></div>`;
+}
+
+function lineChart(id, data, labels, color, data2, color2, label2) {
+  if (charts[id]) charts[id].destroy();
+  const ds = [{ data, borderColor:color, backgroundColor:color+'18', borderWidth:1.5, pointRadius:2, fill:true, tension:.35, label:'' }];
+  if (data2) ds.push({ data:data2, borderColor:color2, backgroundColor:color2+'18', borderWidth:1.5, pointRadius:2, fill:true, tension:.35, label:label2||'' });
+  charts[id] = new Chart(document.getElementById(id), {
+    type: 'line', data: { labels, datasets: ds },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins: { legend: { display: !!data2, labels: { color:'#9a9a9a', font:{size:11}, boxWidth:10 } } },
+      scales: {
+        x: { ticks: { color:'#555', font:{size:10}, maxTicksLimit:10 }, grid: { color:'rgba(255,255,255,.04)' } },
+        y: { ticks: { color:'#555', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' } }
+      }}
+  });
+}
+
+function renderHR() {
+  const d = S.hrData.slice(-90);
+  if (d.length) lineChart('hrC', d.map(r=>r.hr), d.map(r=>r.date.substring(5)), '#ef4444');
+}
+function renderBB() {
+  const d = S.bbData.slice(-30);
+  if (d.length) lineChart('bbC', d.map(r=>r.high), d.map(r=>r.date.substring(5)), '#22c55e', d.map(r=>r.low), '#f59e0b', 'Soir min');
+}
+function renderTable() {
+  $('abody').innerHTML = S.activities.slice(0, 20).map(a => `
+    <tr>
+      <td>${a.date}</td>
+      <td><span class="tdot" style="background:${TC[a.type]||'#888'}"></span>${a.name||a.type}</td>
+      <td>${fmtDur(a.duration)}</td>
+      <td>${a.distance > 0.1 ? a.distance.toFixed(2)+' km' : '—'}</td>
+      <td>${a.hr > 0 ? a.hr+' bpm' : '—'}</td>
+      <td>${a.calories > 0 ? a.calories+' kcal' : '—'}</td>
+    </tr>`).join('');
+}
+function renderType() {
+  const cnt = {}; S.activities.forEach(a => { cnt[a.type]=(cnt[a.type]||0)+1; });
+  const sorted = Object.entries(cnt).sort(([,a],[,b])=>b-a).slice(0,7);
+  if (!sorted.length) return;
+  if (charts.type) charts.type.destroy();
+  charts.type = new Chart(document.getElementById('typeC'), {
+    type:'doughnut',
+    data:{ labels:sorted.map(([t])=>t), datasets:[{ data:sorted.map(([,n])=>n), backgroundColor:sorted.map(([t])=>TC[t]||'#888'), borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{ position:'right', labels:{ color:'#9a9a9a', font:{size:11}, boxWidth:10, padding:8 } } } }
+  });
+}
+function renderWeek() {
+  const wk = {};
+  S.activities.forEach(a => {
+    const d = new Date(a.date); if (isNaN(d)) return;
+    const mon = new Date(d); mon.setDate(d.getDate() - (d.getDay()||7) + 1);
+    const k = mon.toISOString().substring(0, 10);
+    wk[k] = (wk[k]||0) + (a.duration||0) / 60000;
+  });
+  const sorted = Object.entries(wk).sort(([a],[b])=>a.localeCompare(b)).slice(-12);
+  if (!sorted.length) return;
+  if (charts.week) charts.week.destroy();
+  charts.week = new Chart(document.getElementById('weekC'), {
+    type:'bar',
+    data:{ labels:sorted.map(([d])=>d.substring(5)), datasets:[{ data:sorted.map(([,v])=>Math.round(v)), backgroundColor:'#3b82f640', borderColor:'#3b82f6', borderWidth:1, borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ color:'#555', font:{size:10}, maxRotation:45, autoSkip:false }, grid:{ display:false } },
+        y:{ ticks:{ color:'#555', font:{size:10}, callback:v=>v+'min' }, grid:{ color:'rgba(255,255,255,.04)' } }
+      }}
+  });
+}
+function renderDetected() {
+  if (!S.detected.length) return;
+  $('detsec').style.display = 'block';
+  $('detlist').innerHTML = S.detected.map(d => `
+    <div class="di">
+      <div class="dic">${d.confidence>75?'🔥':d.confidence>60?'💪':'🏃'}</div>
+      <div class="din"><div class="nm">${d.label} — ${d.date}</div><div class="mt3">FC repos ${d.hr} bpm (baseline ${d.baseline} bpm, +${d.elev})</div></div>
+      <div><div style="font-size:11px;color:var(--text3);text-align:right;margin-bottom:4px">${d.confidence}%</div><div class="cb"><div class="cf" style="width:${d.confidence}%"></div></div></div>
+    </div>`).join('');
+}
+
+// ── Chat ───────────────────────────────────────────────────────────────────
+function ctx() {
+  const acts = S.activities.slice(0,60).map(a=>`${a.date}|${a.type}|${fmtDur(a.duration)}|${a.distance>0.1?a.distance.toFixed(1)+'km':''}|FC:${a.hr||'?'}|${a.calories||0}kcal`).join('\n');
+  const hr   = S.hrData.slice(-30).map(d=>`${d.date}:${d.hr}bpm`).join(', ');
+  const bb   = S.bbData.slice(-14).map(d=>`${d.date}:⬆${d.high}/⬇${d.low}`).join(', ');
+  const det  = S.detected.map(d=>`${d.date}:${d.label}(FC ${d.hr},base ${d.baseline},conf ${d.confidence}%)`).join('\n');
+  return `Tu es un coach sportif expert analysant des données Garmin.\n\nACTIVITÉS (${S.activities.length} total) :\n${acts||'—'}\n\nFC REPOS 30j :\n${hr||'—'}\n\nBODY BATTERY 14j (matin/soir) :\n${bb||'—'}\n\nEFFORTS DÉTECTÉS PASSIVEMENT :\n${det||'aucun'}\n\nRéponds en français, sois concis et cite les chiffres.`;
+}
+
+$ci.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+$ci.addEventListener('input', () => { $ci.style.height='auto'; $ci.style.height=Math.min($ci.scrollHeight,120)+'px'; });
+$sb.addEventListener('click', send);
+
+async function send() {
+  const txt = $ci.value.trim(); if (!txt || S.loading) return;
+  addMsg('u', txt); $ci.value=''; $ci.style.height='auto';
+  S.history.push({ role:'user', content:txt });
+  const tid = addTyping(); S.loading=true; updBtn();
+  try {
+    const msgs = [{ role:'user', content:ctx()+'\n\nQuestion : '+txt }];
+    if (S.history.length > 2) {
+      const hist = S.history.slice(-6); msgs.length=0;
+      msgs.push({ role:'user', content:ctx() });
+      msgs.push({ role:'assistant', content:'OK, données chargées.' });
+      hist.forEach(m => msgs.push(m));
+    }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-api-key':S.apiKey, 'anthropic-version':'2023-06-01' },
+      body:JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1000, messages:msgs })
+    });
+    const data = await res.json(); removeTyping(tid);
+    if (data.error) throw new Error(data.error.message);
+    const reply = data.content.map(b=>b.text||'').join('');
+    S.history.push({ role:'assistant', content:reply });
+    addMsg('a', reply);
+  } catch(e) { removeTyping(tid); addMsg('a', '⚠️ Erreur : '+e.message); }
+  finally { S.loading=false; updBtn(); }
+}
+
+function addMsg(role, txt) {
+  const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const d = document.createElement('div'); d.className='msg '+(role==='user'?'u':'a');
+  d.innerHTML=`<div class="bbl">${esc(txt)}</div><span class="mt2">${now}</span>`;
+  $msgs.appendChild(d); $msgs.scrollTop=$msgs.scrollHeight;
+}
+function addTyping() {
+  const id='t'+Date.now(); const d=document.createElement('div'); d.className='msg a'; d.id=id;
+  d.innerHTML='<div class="bbl"><div class="dots"><span></span><span></span><span></span></div></div>';
+  $msgs.appendChild(d); $msgs.scrollTop=$msgs.scrollHeight; return id;
+}
+function removeTyping(id){ const e=document.getElementById(id); if(e) e.remove(); }
+function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+</script>
+</body>
+</html>
